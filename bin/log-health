@@ -1,0 +1,51 @@
+#!/bin/bash
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+source "$BASE_DIR/lib/colors.sh"
+source "$BASE_DIR/lib/printer.sh"
+source "$BASE_DIR/lib/helpers.sh"
+source "$BASE_DIR/lib/logs.sh"
+
+title "LOG HEALTH"
+
+critical=$(critical_count)
+boot=$(boot_warning_count)
+kernel=$(kernel_warning_count)
+oom=$(oom_count)
+auth=$(auth_failure_count)
+
+section "Summary"
+
+kv "Critical Logs" "$critical"
+kv "Boot Warnings" "$boot"
+kv "Kernel Warnings" "$kernel"
+kv "OOM Events" "$oom"
+kv "Auth Failures" "$auth"
+
+section "Recent Critical Logs"
+
+recent=$(recent_critical)
+
+if [ -z "$recent" ]; then
+    ok "No recent critical logs"
+else
+    echo "$recent"
+fi
+
+section "Health Summary"
+
+issues=0
+
+if [ "$critical" -gt 0 ]; then warn "Critical logs detected"; ((issues++)); else ok "No critical logs"; fi
+if [ "$kernel" -gt 0 ]; then warn "Kernel warnings detected"; ((issues++)); else ok "No kernel warnings"; fi
+if [ "$oom" -gt 0 ]; then fail "OOM events detected"; ((issues++)); else ok "No OOM events"; fi
+if [ "$auth" -gt 0 ]; then warn "Authentication failures detected"; ((issues++)); else ok "No authentication failures"; fi
+
+echo
+
+if [ "$issues" -eq 0 ]; then
+    echo -e "${GREEN}${BOLD}Overall Status : HEALTHY${RESET}"
+else
+    echo -e "${YELLOW}${BOLD}Overall Status : REVIEW LOGS${RESET}"
+fi
