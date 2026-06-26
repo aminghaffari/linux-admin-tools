@@ -1,0 +1,121 @@
+#!/bin/bash
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+source "$BASE_DIR/lib/colors.sh"
+source "$BASE_DIR/lib/printer.sh"
+source "$BASE_DIR/lib/helpers.sh"
+source "$BASE_DIR/lib/network.sh"
+
+title "NETWORK HEALTH"
+
+iface=$(default_interface)
+gateway=$(default_gateway)
+
+section "Interface"
+
+kv "Interface" "$iface"
+kv "State" "$(interface_state "$iface")"
+kv "IPv4" "$(ipv4_address "$iface")"
+kv "IPv6" "$(ipv6_address "$iface")"
+kv "Gateway" "$gateway"
+kv "MTU" "$(interface_mtu "$iface")"
+kv "MAC" "$(interface_mac "$iface")"
+
+section "Connectivity"
+
+if ping_host "$gateway"; then
+    ok "Gateway reachable ($(ping_avg "$gateway") ms)"
+else
+    fail "Gateway unreachable"
+fi
+
+if ping_host "1.1.1.1"; then
+    ok "Internet reachable (1.1.1.1 - $(ping_avg 1.1.1.1) ms)"
+else
+    fail "Cannot reach 1.1.1.1"
+fi
+
+if ping_host "8.8.8.8"; then
+    ok "Internet reachable (8.8.8.8 - $(ping_avg 8.8.8.8) ms)"
+else
+    fail "Cannot reach 8.8.8.8"
+fi
+
+section "DNS"
+
+echo "Configured DNS:"
+dns_servers
+
+echo
+
+if resolve_host google.com; then
+    ok "google.com resolved"
+else
+    fail "google.com resolution failed"
+fi
+
+if resolve_host github.com; then
+    ok "github.com resolved"
+else
+    fail "github.com resolution failed"
+fi
+
+section "Public IP"
+
+kv "Public IP" "$(public_ip)"
+
+section "Routing"
+default_route
+
+section "Packet Loss"
+
+kv "Gateway Loss" "$(packet_loss "$gateway")"
+kv "1.1.1.1 Loss" "$(packet_loss 1.1.1.1)"
+kv "8.8.8.8 Loss" "$(packet_loss 8.8.8.8)"
+
+section "Listening Ports"
+listening_ports
+
+section "Interface Statistics"
+interface_errors "$iface"
+
+section "Health Summary"
+
+health=0
+
+if [ "$(interface_state "$iface")" = "up" ]; then
+    ok "Interface is up"
+else
+    fail "Interface is down"
+    ((health++))
+fi
+
+if ping_host "$gateway"; then
+    ok "Gateway reachable"
+else
+    fail "Gateway unreachable"
+    ((health++))
+fi
+
+if ping_host 1.1.1.1; then
+    ok "Internet reachable"
+else
+    fail "Internet unreachable"
+    ((health++))
+fi
+
+if resolve_host google.com; then
+    ok "DNS resolution works"
+else
+    fail "DNS resolution failed"
+    ((health++))
+fi
+
+echo
+
+if [ "$health" -eq 0 ]; then
+    echo -e "${GREEN}${BOLD}Overall Status : HEALTHY${RESET}"
+else
+    echo -e "${RED}${BOLD}Overall Status : NETWORK ISSUE${RESET}"
+fi
