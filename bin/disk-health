@@ -1,0 +1,44 @@
+#!/bin/bash
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+source "$BASE_DIR/lib/colors.sh"
+source "$BASE_DIR/lib/printer.sh"
+source "$BASE_DIR/lib/helpers.sh"
+source "$BASE_DIR/lib/disk.sh"
+
+title "DISK HEALTH"
+
+section "Disk Usage"
+disk_usage
+
+section "Partitions Above 80%"
+high=$(disk_usage_high)
+
+if [ -z "$high" ]; then
+    ok "No partition above 80%"
+else
+    echo "$high"
+fi
+
+section "Inode Usage"
+inode_usage
+
+section "Mount Points"
+mount_points
+
+section "Read Only Mounts"
+ro=$(readonly_mounts)
+
+if [ -z "$ro" ]; then
+    ok "No read-only mounts"
+else
+    echo "$ro"
+fi
+
+section "Largest Directories (/var)"
+largest_dirs_var
+
+section "Largest Directories (/)"
+largest_dirs_root
+
