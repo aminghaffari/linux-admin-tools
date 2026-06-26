@@ -1,0 +1,64 @@
+#!/bin/bash
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+source "$BASE_DIR/lib/colors.sh"
+source "$BASE_DIR/lib/printer.sh"
+source "$BASE_DIR/lib/helpers.sh"
+source "$BASE_DIR/lib/security.sh"
+
+title "SECURITY HEALTH"
+
+section "Firewall"
+kv "Status" "$(firewall_status)"
+
+section "SSH"
+kv "Root Login" "$(ssh_root_login)"
+kv "Password Auth" "$(ssh_password_auth)"
+kv "Port" "$(ssh_port)"
+
+section "Users"
+kv "UID 0 Users" "$(uid0_users | xargs)"
+kv "Shell Users" "$(shell_users | xargs)"
+kv "Empty Passwords" "$(empty_password_users | xargs)"
+
+section "Sudo"
+kv "Sudo Users" "$(sudo_users)"
+
+section "Updates"
+kv "Security Updates" "$(security_updates)"
+
+section "Health Summary"
+
+issues=0
+
+fw=$(firewall_status)
+root_login=$(ssh_root_login)
+pass_auth=$(ssh_password_auth)
+empty_pass=$(empty_password_users)
+updates=$(security_updates)
+
+if echo "$fw" | grep -qi "Status: active"; then
+    ok "Firewall enabled"
+else
+    warn "Firewall not active"
+    ((issues++))
+fi
+
+if [ "$root_login" = "no" ]; then ok "SSH root login disabled"; else warn "SSH root login not explicitly disabled"; ((issues++)); fi
+if [ "$pass_auth" = "no" ]; then ok "SSH password auth disabled"; else warn "SSH password auth not explicitly disabled"; ((issues++)); fi
+if [ -z "$empty_pass" ]; then ok "No empty-password users"; else fail "Empty-password users found"; ((issues++)); fi
+
+if [[ "$updates" =~ ^[0-9]+$ ]] && [ "$updates" -gt 0 ]; then
+    warn "$updates security updates available"
+    ((issues++))
+else
+    ok "No security updates detected"
+fi
+
+echo
+if [ "$issues" -eq 0 ]; then
+    echo -e "${GREEN}${BOLD}Overall Status : GOOD${RESET}"
+else
+    echo -e "${YELLOW}${BOLD}Overall Status : REVIEW SECURITY${RESET}"
+fi
